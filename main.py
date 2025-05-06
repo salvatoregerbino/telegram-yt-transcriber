@@ -16,31 +16,31 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Funzione per il comando /start
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: CallbackContext) -> None: #AGGIUNTO 'async'
     """Invia un messaggio quando viene eseguito il comando /start."""
     user = update.effective_user
     logger.info(f"Comando /start ricevuto da {user.username} ({user.id})")
-    update.message.reply_markdown_v2(
+    await update.message.reply_markdown_v2( #AGGIUNTO 'await'
         fr'Ciao {user.mention_markdown_v2()}\! Inviami il link di un video YouTube che vuoi trascrivere\.',
     )
 
 # Funzione per gestire i messaggi di testo (che non sono comandi)
-def handle_message(update: Update, context: CallbackContext) -> None:
+async def handle_message(update: Update, context: CallbackContext) -> None: #AGGIUNTO 'async'
     """Gestisce i messaggi di testo ricevuti."""
     user_message = update.message.text
     logger.info(f"Messaggio ricevuto da {update.effective_user.first_name}: {user_message}")
 
     # Qui aggiungeremo la logica per validare il link e avviare la trascrizione
     # Per ora, rispondiamo semplicemente confermando la ricezione
-    update.message.reply_text(f'Ho ricevuto il tuo messaggio. Analizzerò il link: {user_message}')
+    await update.message.reply_text(f'Ho ricevuto il tuo messaggio. Analizzerò il link: {user_message}') #AGGIUNTO 'await'
 
 # Funzione per gestire gli errori
-def error_handler(update: object, context: CallbackContext) -> None:
+async def error_handler(update: object, context: CallbackContext) -> None: #AGGIUNTO 'async'
     """Logga gli Errori causati dagli Update."""
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
     # Potresti voler informare l'utente che c'è stato un problema
     # if isinstance(update, Update):
-    #     update.message.reply_text("Si è verificato un errore interno. Riprova più tardi.")
+    #     await update.message.reply_text("Si è verificato un errore interno. Riprova più tardi.") #AGGIUNTO  'await'
 
 def main() -> None:
     """Avvia il bot."""
