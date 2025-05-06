@@ -66,8 +66,8 @@ def main() -> None:
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
         # Registra l'handler per gli errori
-        #logger.debug("Aggiunta error handler")
-        #application.add_error_handler(error_handler)
+        logger.debug("Aggiunta error handler")
+        application.add_error_handler(error_handler)
 
         # Avvia il Bot in modalità polling
         logger.info("Bot pronto per avviarsi (run_polling)...")
