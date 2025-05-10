@@ -20,7 +20,19 @@
         * Risoluzione problema di arresto anomalo del bot.
     * Bot di base funzionante: risponde a `/start` e a messaggi di testo, con gestione errori attiva.
     * Codice funzionante committato e unito al branch `main`.
-
+      
+  * **Troubleshooting Avanzato Validazione URL (2025-05-10):**
+        * Sviluppo iniziale del pattern regex per la validazione.
+        * Emersione di un comportamento anomalo: l'URL di test `https://www.youtube.com/watch?v=dQw4w9WgXcqqqqq12:58` (inteso come non-YouTube valido) veniva erroneamente identificato come link YouTube.
+        * **Indagine Approfondita sulla "Stringa Anomala":**
+            * Utilizzo di `test_regex.py` per isolare il problema: si è scoperto che la stringa di test, nonostante apparisse corta con `print()` e `repr()`, aveva `len() == 52`.
+            * L'analisi dei caratteri (`ord()`) ha rivelato che la stringa conteneva in realtà un URL YouTube completo e valido: `https://www.youtube.com/watch?v=dQw4w9WgXcqqqqq12:58`. Questo accadeva anche inserendo la stringa manualmente nell'editor `nano`.
+            * La costruzione programmatica della stringa "pulita" (es. `https://www.youtube.com/watch?v=dQw4w9WgXcqqqqq12:58`, 42 caratteri) in `test_regex.py` ha confermato il corretto funzionamento del regex (nessun match).
+            * Il problema della stringa anomala (52 caratteri, `repr()` fuorviante) è stato replicato anche per i messaggi `update.message.text` ricevuti da Telegram nel bot `main.py`.
+            * L'analisi dei caratteri (`ord()`) in `main.py` ha confermato che il bot riceve da Telegram la stringa completa di 52 caratteri. Anche le `entities` del messaggio Telegram indicavano una lunghezza di 52.
+            * Un tentativo di "pulizia" della stringa con `string.printable` non ha sortito l'effetto desiderato, poiché tutti i 52 caratteri della stringa anomala sono risultati "stampabili".
+        * **Conclusione Attuale:** Il regex e il codice Python del bot funzionano correttamente con i dati che ricevono. La stringa di 52 caratteri `https://www.youtube.com/watch?v=dQw4w9WgXcqqqqq12:58` *è* strutturalmente un link YouTube valido. Il problema principale è capire perché l'input utente, inteso come la versione più corta, arrivi al bot come questa stringa più lunga e completa.
+        * **Prossimi Passi (per la stringa anomala):** Indagare il metodo di input dell'utente nel client Telegram (digitazione vs copia-incolla, origine del testo copiato), testare con URL semplici e diversi, e se possibile con client Telegram differenti.
 ## Task Attuali
 
 * **Implementazione Validazione URL di YouTube (Branch: `feature/validate-youtube-url`):**
