@@ -1,16 +1,20 @@
 import logging
 import os
-import re # Import per le espressioni regolari
+import re
+import string # <-- MODIFICA: Aggiunto import necessario
 from dotenv import load_dotenv
-from telegram import Update
-# Assicurati che ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext siano importati
+from telegram import Update, constants # <-- MODIFICA: Aggiunto constants per ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
 
-# Abilita il logging per vedere errori e informazioni (lasciamo DEBUG per ora)
+# Configurazione del logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.DEBUG
 )
+# MODIFICA: Silenzia i log troppo verbosi di httpx e httpcore a livello DEBUG
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # Carica le variabili d'ambiente dal file .env
@@ -22,53 +26,66 @@ async def start(update: Update, context: CallbackContext) -> None:
     """Invia un messaggio quando viene eseguito il comando /start."""
     user = update.effective_user
     logger.info(f"Comando /start ricevuto da {user.username} ({user.id})")
-    await update.message.reply_markdown_v2(
-        fr'Ciao {user.mention_markdown_v2()}\! Inviami il link di un video YouTube che vuoi trascrivere\.',
+    # MODIFICA: Assicurato l'uso corretto di MarkdownV2 e user.mention_markdown_v2()
+    await update.message.reply_text(
+        f"Ciao {user.mention_markdown_v2()}\\! Inviami il link di un video YouTube che vuoi trascrivere\\.",
+        parse_mode=constants.ParseMode.MARKDOWN_V2
     )
 
 # Funzione per gestire i messaggi di testo (che non sono comandi) (asincrona)
 async def handle_message(update: Update, context: CallbackContext) -> None:
-    """Gestisce i messaggi di testo ricevuti e valida gli URL di YouTube."""
-    user_message = update.message.text
-    user = update.effective_user # Corretto da 'update.effective_user.first_name' a 'user' per coerenza
-    logger.info(f"Messaggio ricevuto da {user.first_name}: {user_message}") # Usiamo user.first_name qui per il log
+    """Gestisce i messaggi di testo ricevuti, pulisce l'input e valida gli URL di YouTube."""
+    user_message_original = update.message.text # Messaggio originale come ricevuto
+    user = update.effective_user
+    logger.info(f"Messaggio ORIGINALE ricevuto da {user.first_name}: '{user_message_original}' (len: {len(user_message_original)}) (repr: {repr(user_message_original)})")
 
- # Pattern Regex per URL di YouTube (ulteriore revisione)
+# --- Blocco per Analisi Caratteri user_message_original ---
+    logger.debug("--- Character Analysis for user_message_original from Telegram ---")
+    char_details_telegram = []
+    try:
+        for i, char_in_string in enumerate(user_message_original):
+            char_details_telegram.append(f"Idx {i}: '{repr(char_in_string)}' Ord: {ord(char_in_string)} Hex: {hex(ord(char_in_string))}")
+        # Stampa i dettagli dei caratteri, 3 per riga per leggibilità se sono molti
+        for i in range(0, len(char_details_telegram), 3):
+            logger.debug(" | ".join(char_details_telegram[i:i+3]))
+    except Exception as e: # Questa era la riga 52, ora dovrebbe essere indentata correttamente
+        logger.error(f"Errore durante l'analisi dei caratteri di user_message_original: {e}")
+    logger.debug(f"Length of user_message_original (post-analysis): {len(user_message_original)}")
+    logger.debug(f"repr(user_message_original) (post-analysis): {repr(user_message_original)}")
+    logger.debug("--- End Character Analysis ---")
+    # --- Fine Blocco Analisi Caratteri ---
+
+    # MODIFICA CHIAVE: "Pulizia" della stringa di input
+    user_message_pulito = "".join(filter(lambda x: x in string.printable, user_message_original))
+    
+    logger.info(f"Messaggio PULITO per regex: '{user_message_pulito}' (len: {len(user_message_pulito)}) (repr: {repr(user_message_pulito)})")
+
+    # Pattern Regex per URL di YouTube
     youtube_regex = (
         r'^(?:https?:\/\/)?(?:www\.|m\.)?'
-        r'(?:'  # Inizio del gruppo principale di alternative
-            # Alternativa 1: youtube.com con percorsi specifici
-            r'youtube\.com\/(?:watch\?v=|embed\/|live\/|v\/|shorts\/)([a-zA-Z0-9_-]{11})'  # Gruppo di cattura 1 per l'ID
-            r'|'  # OR
-            # Alternativa 2: youtu.be
-            r'youtu\.be\/([a-zA-Z0-9_-]{11})'  # Gruppo di cattura 2 per l'ID
-        r')'  # Fine del gruppo principale di alternative
-        r'(?:\S*)?$'  # Permette caratteri aggiuntivi (parametri) fino alla fine
+        r'(?:'
+            r'youtube\.com\/(?:watch\?v=|embed\/|live\/|v\/|shorts\/)([a-zA-Z0-9_-]{11})'
+            r'|'
+            r'youtu\.be\/([a-zA-Z0-9_-]{11})'
+        r')'
+        r'(?:\S*)?$'
     )
-
-    logger.debug(f"Using regex pattern: '{youtube_regex}'") # <<< NUOVA RIGA DI DEBUG AGGIUNTA QUI
-    logger.debug(f"Attempting to match regex on raw user_message: '{user_message}'") # NUOVA RIGA DI DEBUG
-    logger.debug(f"Length of user_message from Telegram: {len(user_message)}") # <-- NUOVA RIGA
-    logger.debug(f"repr(user_message) from Telegram: {repr(user_message)}")   # <-- NUOVA RIGA
-
-
-    match = re.search(youtube_regex, user_message)
-    video_id = None # Inizializziamo video_id a None
+    
+    logger.debug(f"Using regex pattern: '{youtube_regex}'")
+    
+    # MODIFICA: Usa user_message_pulito per la ricerca con il regex
+    match = re.search(youtube_regex, user_message_pulito) 
+    video_id = None
 
     if match:
-        # Controlliamo quale gruppo ha catturato l'ID
-        # match.group(1) corrisponde all'ID dei link youtube.com
-        # match.group(2) corrisponde all'ID dei link youtu.be
         video_id = match.group(1) if match.group(1) else match.group(2)
-
-    if video_id: # Se video_id è stato trovato (non è più None)
-        logger.info(f"URL di YouTube valido rilevato da {user.first_name}. ID Video: {video_id}")
+        logger.info(f"URL di YouTube valido rilevato (da stringa pulita) da {user.first_name}. ID Video: {video_id}")
         await update.message.reply_text(
             f"URL di YouTube valido rilevato! (ID: {video_id}).\n"
             "Prossimo passo: estrarre informazioni e audio..."
         )
-    else: # Se match è None OPPURE se video_id è rimasto None (non dovrebbe succedere se match è vero con questo regex)
-        logger.info(f"Messaggio da {user.first_name} non è un URL YouTube valido: {user_message}")
+    else:
+        logger.info(f"Messaggio (stringa pulita) da {user.first_name} NON è un URL YouTube valido: '{user_message_pulito}'")
         await update.message.reply_text(
             "Il messaggio non sembra essere un link di YouTube valido. "
             "Per favore, invia un link corretto (es. https://www.youtube.com/watch?v=VIDEO_ID)."
@@ -78,16 +95,19 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
 async def error_handler(update: object, context: CallbackContext) -> None:
     """Logga gli Errori causati dagli Update."""
     logger.error(msg="Exception while handling an update:", exc_info=context.error)
-    # Potresti voler informare l'utente che c'è stato un problema
-    # if isinstance(update, Update) and hasattr(update, 'message'):
-    #     await update.message.reply_text("Si è verificato un errore interno. Riprova più tardi.")
+    # È buona norma informare l'utente, ma assicurati che 'update' sia del tipo corretto
+    if isinstance(update, Update) and update.message:
+        try:
+            await update.message.reply_text("Si è verificato un errore interno. Il team di sviluppo è stato notificato.")
+        except Exception as e:
+            logger.error(f"Errore durante l'invio del messaggio di errore all'utente: {e}")
 
 def main() -> None:
     """Avvia il bot."""
     logger.debug("Funzione main() iniziata.")
 
     if TOKEN is None:
-        logger.error("Errore: Il token del bot non è stato trovato. Assicurati che sia nel file .env")
+        logger.critical("ERRORE: Il token del bot non è stato trovato. Assicurati che TELEGRAM_BOT_TOKEN sia impostato nel file .env e che il file .env sia nella stessa directory di main.py")
         return
 
     logger.debug("Token caricato correttamente.")
@@ -105,21 +125,20 @@ def main() -> None:
         logger.debug("Aggiunta handler per messaggi di testo")
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-        # Registra l'handler per gli errori (ANCORA COMMENTATO, come da ultimo test di stabilità)
-        # logger.debug("Aggiunta error handler")
-        # application.add_error_handler(error_handler)
+        # MODIFICA: Registra l'handler per gli errori (ora ATTIVO)
+        logger.debug("Aggiunta error handler")
+        application.add_error_handler(error_handler)
 
         # Avvia il Bot in modalità polling
-        logger.info("Bot pronto per avviarsi (run_polling) CON CommandHandler e MessageHandler...")
+        logger.info("Bot pronto per avviarsi (run_polling)...")
         application.run_polling()
-        logger.info("run_polling terminato.") # Non dovrebbe essere raggiunto facilmente
+        # Le righe seguenti verranno eseguite solo se run_polling termina (es. con un segnale di stop)
+        logger.info("run_polling terminato.")
 
     except Exception as e:
-        logger.exception(f"Errore critico non gestito nella funzione main: {e}")
+        logger.critical(f"Errore critico non gestito all'avvio o durante l'esecuzione del bot: {e}", exc_info=True)
 
-    logger.debug("Funzione main() terminata.") # Non dovrebbe essere raggiunto facilmente
+    logger.debug("Funzione main() terminata (o interrotta).")
 
-# Questo blocco è FONDAMENTALE per eseguire il bot!
 if __name__ == '__main__':
-    # print("DEBUG: Sto per chiamare main()") # Puoi rimuovere o commentare questo
     main()
