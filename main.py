@@ -46,6 +46,12 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         r'(?:\S*)?$'  # Permette caratteri aggiuntivi (parametri) fino alla fine
     )
 
+    logger.debug(f"Using regex pattern: '{youtube_regex}'") # <<< NUOVA RIGA DI DEBUG AGGIUNTA QUI
+    logger.debug(f"Attempting to match regex on raw user_message: '{user_message}'") # NUOVA RIGA DI DEBUG
+    logger.debug(f"Length of user_message from Telegram: {len(user_message)}") # <-- NUOVA RIGA
+    logger.debug(f"repr(user_message) from Telegram: {repr(user_message)}")   # <-- NUOVA RIGA
+
+
     match = re.search(youtube_regex, user_message)
     video_id = None # Inizializziamo video_id a None
 

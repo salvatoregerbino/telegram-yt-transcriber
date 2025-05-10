@@ -23,7 +23,11 @@
 
 ## Task Attuali
 
-* Pronti per iniziare lo sviluppo delle funzionalità core del bot.
+* **Implementazione Validazione URL di YouTube (Branch: `feature/validate-youtube-url`):**
+    * **Obiettivo:** Modificare la funzione `handle_message` per identificare se un messaggio di testo ricevuto è un URL di YouTube valido.
+    * **Metodo:** Utilizzo di espressioni regolari (regex) con il modulo `re` di Python.
+    * **Librerie Coinvolte:**
+        * `re` (modulo built-in di Python) - [Documentazione Ufficiale `re`](https://docs.python.org/3/library/re.html)
 
 ## Prossimi Passi
 
